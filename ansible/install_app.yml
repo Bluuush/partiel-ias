@@ -1,0 +1,59 @@
+---
+- name: Installation de l'application gist
+  hosts: all
+  become: true
+  vars:
+    app_repo_url: "https://gist.github.com/thibaultserti/21456f4797100376f67443920e5d5145"
+    app_dest: "/opt/myapp"
+  tasks:
+    - name: Installation des paquets essentiels
+      apt:
+        name:
+          - git
+          - curl
+          - build-essential
+        state: present
+        update_cache: yes
+
+    - name: Téléchargement et installation de Node.js
+      get_url:
+        url: "https://deb.nodesource.com/setup_14.x"
+        dest: /tmp/setup_14.sh
+      notify: Install Node.js
+
+    - name: Run Node.js setup script
+      command: bash /tmp/setup_14.sh
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+      notify: Install Node.js
+
+    - name: Install Node.js and npm
+      apt:
+        name: nodejs
+        state: present
+      notify: Install Node.js
+
+    - name: Clone app repo
+      git:
+        repo: "{{ app_repo_url }}"
+        dest: "{{ app_dest }}"
+
+    - name: Change directory to app folder
+      command: chdir={{ app_dest }} npm install
+      args:
+        chdir: "{{ app_dest }}"
+
+    - name: Vérification fonctionnement app
+      command: chdir={{ app_dest }} npm start &
+      args:
+        chdir: "{{ app_dest }}"
+        creates: "{{ app_dest }}/node_modules"
+      async: 10
+      poll: 0
+      register: app_start
+
+  handlers:
+    - name: Install Node.js
+      apt:
+        name: nodejs
+        state: present
